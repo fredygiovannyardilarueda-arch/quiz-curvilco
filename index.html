@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz IA - Curvilco</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#46178f,#25004d);color:#fff;min-height:100vh}
+.wrap{max-width:1000px;margin:auto;padding:24px}.card{background:#fff;color:#222;border-radius:22px;padding:28px;box-shadow:0 15px 40px #0005;margin-top:20px}
+h1{font-size:clamp(28px,5vw,48px);margin:0 0 8px}.sub{opacity:.85}.btn{border:0;border-radius:12px;padding:14px 20px;font-size:18px;font-weight:700;cursor:pointer;margin:6px;background:#7b2cbf;color:white}.btn.secondary{background:#eee;color:#333}.btn.green{background:#198754}.btn.red{background:#dc3545}.hidden{display:none}.choices{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.choice{border:0;border-radius:15px;padding:20px;text-align:left;font-size:20px;font-weight:700;cursor:pointer;color:#fff;min-height:80px}.c1{background:#e21b3c}.c2{background:#1368ce}.c3{background:#d89e00}.c4{background:#26890c}.choice:disabled{opacity:.65}.question{font-size:clamp(24px,4vw,38px);font-weight:800;line-height:1.15}.timer{font-size:50px;font-weight:900;text-align:center;margin:10px}.code{font-size:54px;letter-spacing:8px;font-weight:900;text-align:center}.input{font-size:22px;padding:14px;border:2px solid #ddd;border-radius:10px;width:100%;margin:8px 0}.center{text-align:center}.score{font-size:26px;font-weight:800}.leader{display:flex;justify-content:space-between;padding:12px 14px;background:#f2f2f2;border-radius:10px;margin:7px 0}.small{font-size:14px;color:#666}.pill{display:inline-block;padding:7px 12px;border-radius:20px;background:#eee;color:#333;margin:3px}
+@media(max-width:650px){.choices{grid-template-columns:1fr}.card{padding:20px}.code{font-size:42px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="home" class="card center">
+    <h1>Quiz IA — Curvilco</h1>
+    <p class="sub">Trivia interactiva para responder desde el celular</p>
+    <button class="btn" onclick="show('host')">🎤 Crear partida</button>
+    <button class="btn secondary" onclick="show('player')">📱 Unirme a una partida</button>
+    <p class="small">El anfitrión comparte el código de 6 caracteres. Los participantes responden desde su celular.</p>
+  </div>
+
+  <div id="host" class="card hidden">
+    <div id="hostSetup">
+      <h2>Crear partida</h2>
+      <p>Escribe tu nombre y crea una sala. Mantén esta pantalla abierta durante el juego.</p>
+      <input id="hostName" class="input" placeholder="Nombre del anfitrión" value="Anfitrión">
+      <button class="btn green" onclick="createRoom()">Crear sala</button>
+      <button class="btn secondary" onclick="show('home')">Volver</button>
+    </div>
+    <div id="hostLobby" class="hidden center">
+      <h2>Comparte este código</h2>
+      <div class="code" id="roomCode">------</div>
+      <p>Los participantes deben entrar en <b>Unirme a una partida</b> y escribir este código.</p>
+      <div id="players"></div>
+      <button class="btn green" onclick="startGame()">▶ Iniciar quiz</button>
+    </div>
+    <div id="hostGame" class="hidden"><p class="small">El puntaje se actualiza en vivo cuando cada participante responde.</p>
+      <div class="small" id="hostQ"></div>
+      <div class="question" id="hostQuestion"></div>
+      <div class="timer" id="hostTimer">15</div>
+      <div id="hostAnswers"></div>
+      <button class="btn green" onclick="nextQuestion()">Siguiente</button>
+    </div>
+    <div id="hostEnd" class="hidden center">
+      <h2>🏆 Resultados finales</h2>
+      <div id="finalBoard"></div>
+      <button class="btn" onclick="location.reload()">Nueva partida</button>
+    </div>
+  </div>
+
+  <div id="player" class="card hidden">
+    <div id="playerJoin">
+      <h2>Unirme a la partida</h2>
+      <input id="playerName" class="input" placeholder="Tu nombre">
+      <input id="joinCode" class="input" placeholder="Código de 6 caracteres" maxlength="6" style="text-transform:uppercase">
+      <button class="btn green" onclick="joinRoom()">Entrar</button>
+      <button class="btn secondary" onclick="show('home')">Volver</button>
+      <p class="small">Necesitas internet y debes mantener esta página abierta.</p>
+    </div>
+    <div id="playerLobby" class="hidden center">
+      <h2>¡Estás dentro! 🎉</h2>
+      <p>Espera a que el anfitrión inicie el quiz.</p>
+      <div class="score">Puntaje: <span id="myScore">0</span></div>
+    </div>
+    <div id="playerGame" class="hidden">
+      <div class="small" id="playerQ"></div>
+      <div class="question" id="playerQuestion"></div>
+      <div class="timer" id="playerTimer">15</div>
+      <div class="choices" id="choices"></div>
+      <div class="center score">Puntaje: <span id="liveScore">0</span></div>
+    </div>
+    <div id="playerEnd" class="hidden center">
+      <h2>🎉 Quiz terminado</h2>
+      <div class="score">Tu puntaje: <span id="endScore">0</span></div>
+      <p>¡Gracias por participar!</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const questions=[
+ {q:"¿Cómo se llama la plataforma de Inteligencia Artificial escogida por Curvilco para implementación laboral?",a:["ChatGPT","Claudia","Gemini","Claude"],c:0},
+ {q:"¿Cuántos videos aparecen en el módulo Introducción a Claude?",a:["20 videos","6 videos","No pude ingresar a ver los videos","No sé, no respondo"],c:2},
+ {q:"La actividad propuesta del módulo es:",a:["Crear un sitio web con Claude","Vender libros con Claude","No sé, no respondo","No tuve tiempo"],c:0}
+];
+let peer,conn,roomId,isHost=false,qIndex=0,timerInt,timeLeft=15,players={},myName="",myScore=0,answered=false;
+
+function show(id){document.querySelectorAll(".card").forEach(x=>x.classList.add("hidden"));document.getElementById(id).classList.remove("hidden")}
+function uid(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+function createRoom(){
+ isHost=true; roomId=uid(); myName=document.getElementById("hostName").value.trim()||"Anfitrión";
+ peer=new Peer("curvilco-"+roomId,{debug:0});
+ peer.on("open",()=>{document.getElementById("roomCode").textContent=roomId;document.getElementById("hostSetup").classList.add("hidden");document.getElementById("hostLobby").classList.remove("hidden")});
+ peer.on("connection",c=>{c.on("open",()=>{players[c.peer]={name:"Jugador",score:0,conn:c};c.on("data",d=>hostData(c,d));broadcastPlayers()})});
+}
+function hostData(c,d){
+ if(d.type==="join"){players[c.peer].name=d.name;players[c.peer].score=0;broadcastPlayers()}
+ if(d.type==="answer"){if(d.q===qIndex && !players[c.peer].answered){players[c.peer].answered=true;if(d.answer===questions[qIndex].c){let pts=Math.max(100,1000+timeLeft*50);players[c.peer].score+=pts;renderHostScoreboard()}send(c,{type:"score",score:players[c.peer].score});}}
+}
+function send(c,d){try{c.send(d)}catch(e){}}
+function broadcast(d){Object.values(players).forEach(p=>send(p.conn,d))}
+function broadcastPlayers(){
+ document.getElementById("players").innerHTML=Object.values(players).map(p=>`<span class="pill">👤 ${escapeHtml(p.name)} — ${p.score}</span>`).join("")||"<p>Aún no hay participantes.</p>";
+ broadcast({type:"players",names:Object.values(players).map(p=>p.name)});
+}
+function startGame(){qIndex=0;document.getElementById("hostLobby").classList.add("hidden");document.getElementById("hostGame").classList.remove("hidden");showHostQuestion();broadcast({type:"start"});}
+function showHostQuestion(){
+ const x=questions[qIndex];document.getElementById("hostQ").textContent=`Pregunta ${qIndex+1} de ${questions.length}`;document.getElementById("hostQuestion").textContent=x.q;document.getElementById("hostAnswers").innerHTML=x.a.map((a,i)=>`<div class="pill">${String.fromCharCode(65+i)}. ${escapeHtml(a)}</div>`).join("");
+ Object.values(players).forEach(p=>p.answered=false);timeLeft=15;document.getElementById("hostTimer").textContent=timeLeft;renderHostScoreboard();
+ broadcast({type:"question",q:qIndex,question:x.q,answers:x.a,time:15});
+ clearInterval(timerInt);timerInt=setInterval(()=>{timeLeft--;document.getElementById("hostTimer").textContent=timeLeft;broadcast({type:"time",time:timeLeft});if(timeLeft<=0){clearInterval(timerInt)}},1000);
+}
+function renderHostScoreboard(){
+ const arr=Object.values(players).sort((a,b)=>b.score-a.score);
+ const board=arr.map((p,i)=>`<div class="leader"><b>${i+1}. ${escapeHtml(p.name)}</b><span>${p.score} pts</span></div>`).join("");
+ document.getElementById("hostAnswers").innerHTML += `<div style="margin-top:18px"><b>🏆 Puntaje en vivo</b>${board||"<p>Sin participantes.</p>"}</div>`;
+}
+function nextQuestion(){if(qIndex<questions.length-1){qIndex++;showHostQuestion()}else endHost()}
+function endHost(){clearInterval(timerInt);document.getElementById("hostGame").classList.add("hidden");document.getElementById("hostEnd").classList.remove("hidden");let arr=Object.values(players).sort((a,b)=>b.score-a.score);document.getElementById("finalBoard").innerHTML=arr.map((p,i)=>`<div class="leader"><b>${i+1}. ${escapeHtml(p.name)}</b><span>${p.score} pts</span></div>`).join("")||"<p>No hubo participantes.</p>";broadcast({type:"end"});}
+function joinRoom(){
+ myName=document.getElementById("playerName").value.trim()||"Jugador";roomId=document.getElementById("joinCode").value.trim().toUpperCase();
+ if(!roomId)return alert("Escribe el código de la partida.");
+ peer=new Peer();
+ peer.on("open",()=>{conn=peer.connect("curvilco-"+roomId);conn.on("open",()=>{send(conn,{type:"join",name:myName});document.getElementById("playerJoin").classList.add("hidden");document.getElementById("playerLobby").classList.remove("hidden")});conn.on("data",playerData);conn.on("error",()=>alert("No se pudo conectar con la sala."));});
+}
+function playerData(d){
+ if(d.type==="start"){document.getElementById("playerLobby").classList.add("hidden");document.getElementById("playerGame").classList.remove("hidden")}
+ if(d.type==="question"){answered=false;renderQuestion(d)}
+ if(d.type==="time"){document.getElementById("playerTimer").textContent=d.time;if(d.time<=0)disableChoices()}
+ if(d.type==="score"){myScore=d.score;document.getElementById("liveScore").textContent=myScore;document.getElementById("myScore").textContent=myScore}
+ if(d.type==="end"){document.getElementById("playerGame").classList.add("hidden");document.getElementById("playerEnd").classList.remove("hidden");document.getElementById("endScore").textContent=myScore}
+}
+function renderQuestion(d){qIndex=d.q;document.getElementById("playerQ").textContent=`Pregunta ${d.q+1} de ${questions.length}`;document.getElementById("playerQuestion").textContent=d.question;document.getElementById("playerTimer").textContent=d.time;document.getElementById("choices").innerHTML=d.answers.map((a,i)=>`<button class="choice c${i+1}" onclick="answer(${i},this)">${String.fromCharCode(65+i)}. ${escapeHtml(a)}</button>`).join("");}
+function answer(i,el){if(answered)return;answered=true;document.querySelectorAll(".choice").forEach(b=>b.disabled=true);el.style.outline="5px solid #222";send(conn,{type:"answer",q:qIndex,answer:i})}
+function disableChoices(){document.querySelectorAll(".choice").forEach(b=>b.disabled=true)}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+</script>
+</body>
+</html>
